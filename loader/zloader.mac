@@ -1,0 +1,24 @@
+ROUTINE %ZLOADER
+%ZLOADER(%curdir,%file,%opt...) public {
+ set rc=0
+ try {
+	do SetIO^%SYS.NLS("SJIS")
+	write "****** loader ver. 2.0 **********",!,$zv,!
+	 set ret=$SYSTEM.OBJ.Load(%file,"ck",,.rtn,,"zInstProc.INT")
+	 if 'ret {
+		 do $SYSTEM.OBJ.DisplayError(ret)
+		 set rc=18
+		 quit
+	 }
+	 set ret=$$Install^zInstProc()
+	 if 'ret {
+		 do $SYSTEM.OBJ.DisplayError(ret)
+		 set rc=18
+		 quit
+	 }
+ } catch e {
+	 write "ZLOADERロードエラー:",$zerror,! 
+	 set rc=19
+ }
+ quit rc
+}
