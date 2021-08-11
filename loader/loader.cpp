@@ -107,68 +107,15 @@ wchar_t * getiriserror(int rc)
 	return sMes;
 }
 
-/*
-// ログ出力スレッド処理
-DWORD WINAPI writelogtoconsole(LPVOID p)
-{
-	char stsbuf[1024];
-	int		sc;
-
-	TCHAR errmsg[2048];
-
-	DWORD len, nBytesRead, nCharsWritten;
-
-	// 名前付きパイプオープン
-	hPipe = CreateNamedPipe(L"\\\\.\\pipe\\mypipe",
-		PIPE_ACCESS_INBOUND, PIPE_TYPE_BYTE | PIPE_WAIT, 1, 0, 0, 100, NULL);
-	if (hPipe == INVALID_HANDLE_VALUE) {
-		fwprintf(stdout, L"名前付きパイプがオープンできませんでした\n");
-		CloseHandle(hOut);
-		return STS_IOERR;
-	}
-	if (!ConnectNamedPipe(hPipe, NULL)) {
-		fwprintf(stdout, L"名前付きパイプに接続できませんでした");
-		CloseHandle(hPipe);
-		CloseHandle(hOut);
-		return STS_IOERR;
-	}
-
-	while ((sc = ReadFile(hPipe, stsbuf, (DWORD)(sizeof(stsbuf) - 1), &nBytesRead, 0)) && nBytesRead != 0) {
-		stsbuf[nBytesRead] = 0;
-		WriteConsole(GetStdHandle(STD_OUTPUT_HANDLE), stsbuf, nBytesRead, &nCharsWritten, NULL);
-		if (hOut != INVALID_HANDLE_VALUE) {
-			WriteFile(hOut, stsbuf, nBytesRead, &nCharsWritten, NULL);
-		}
-	}
-
-	CloseHandle(hPipe);
-	if (hOut != INVALID_HANDLE_VALUE) {
-		CloseHandle(hOut);
-	}
-	if (!sc) {
-		if (GetLastError() == ERROR_BROKEN_PIPE)
-			return STS_SUCCESS;
-
-		len = FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM, 0, GetLastError(), 0, errmsg, sizeof(errmsg), 0);
-		errmsg[len] = 0;
-		fwprintf(stdout, L"IRISの出力データが読めません\n%s", errmsg);
-		return STS_IOERR;
-	}
-
-	return STS_SUCCESS;
-}
-*/
 // メイン処理
 int _tmain(int argc, _TCHAR* argv[])
 {
 	// ファイル名格納領域
 	wchar_t loadfile[32768];
 	wchar_t curdir[32768];
-	//wchar_t logfile[2048];
 	wchar_t errmsg[2048];
 
 	int len;
-	//TCHAR buf[2048];
 
 	int termflag = IRIS_PROGMODE | IRIS_TTALL;
 	int	rc, timeout = 10;
@@ -185,12 +132,6 @@ int _tmain(int argc, _TCHAR* argv[])
 		_ftprintf(stdout, _T("使用方法: loader [ -U ネームスペース ] インストールファイル名 [ オプション... ]\n"));
 		return rc;
 	}
-	/*
-	// 入出力デバイス名の設定(空文字)
-	pInput.len = 0;
-	wcscpy_s((wchar_t *) pOutput.str,32767, L"\\\\.\\pipe\\mypipe");
-	pOutput.len = wcslen(L"\\\\.\\pipe\\mypipe");
-	*/
 	// 二重起動の禁止
 	HANDLE hMutex;
 
@@ -207,38 +148,10 @@ int _tmain(int argc, _TCHAR* argv[])
 		return STS_BUSY;
 	}
 
-	/*
-	// 出力ファイルオープン
-	SECURITY_ATTRIBUTES sa = { sizeof(SECURITY_ATTRIBUTES), NULL, TRUE };
-	wsprintf(logfile, L"%s\\rtnload.log", curdir);
-	if (logfile != NULL) {
-		if ((hOut = CreateFile(logfile, GENERIC_WRITE, FILE_SHARE_READ, &sa, CREATE_ALWAYS, 0, 0)) == INVALID_HANDLE_VALUE) {
-			int len = FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM, 0, GetLastError(), 0, errmsg, sizeof(errmsg), 0);
-			errmsg[len] = 0;
-			fwprintf(stdout, L"ログファイルがオープンできませんでした\n%s\n", errmsg);
-			// ログファイルがオープンできなかった場合でも続行
-			logfile[0] = '\0';
-		}
-	}
-
-	// ログ出力スレッドの作成
-	HANDLE hThread = CreateThread(NULL, 0, writelogtoconsole, NULL, 0, 0);
-	if (hThread == NULL) {
-		len = FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM, 0, GetLastError(), 0, errmsg, sizeof(errmsg), 0);
-		errmsg[len] = 0;
-		fwprintf(stdout, L"ログ出力スレッドがオープンできませんでした\n%s\n", errmsg);
-		CloseHandle(hPipe);
-		CloseHandle(hOut);
-		return STS_IOERR;
-	}
-	*/
 	// 実行ファイルのパスを求める
 	if (!GetModuleFileNameA(NULL, myBinaryDir, MAX_PATH))
 	{
 		_ftprintf(stdout, _T("実行ファイルのディレクトリが取得できません\n"));
-		//swprintf(buf, 2047, _T("実行ファイルのディレクトリが取得できません\n"));
-		//WriteFile(hOut, buf, wcslen(buf), NULL, NULL);
-		//CloseHandle(hOut);
 		return STS_INVBINDIRERR;
 	}
 
@@ -246,9 +159,6 @@ int _tmain(int argc, _TCHAR* argv[])
 	char *pTmp = strrchr(myBinaryDir, (int)'\\');
 	if (pTmp == NULL) {
 		_ftprintf(stdout, _T("Mgrディレクトリが取得できません\n"));
-		//swprintf(buf, 2047,_T("Mgrディレクトリが取得できません\n"));
-		//WriteFile(hOut, buf, wcslen(buf), NULL, NULL);
-	//	CloseHandle(hOut);
 		return STS_INVBINDIRERR;
 	}
 	*(pTmp+1) = '\0';
@@ -272,9 +182,6 @@ int _tmain(int argc, _TCHAR* argv[])
 	rc = IRISSETDIR(myMgrDir);
 	if (rc != IRIS_SUCCESS) {
 		_ftprintf(stdout, _T("Mgrディレクトリが設定できません\n"));
-		//swprintf(buf, 2047, _T("Mgrディレクトリが設定できません\n"));
-		//WriteFile(hOut, buf, wcslen(buf), NULL, NULL);
-		//CloseHandle(hOut);
 		return STS_INVBINDIRERR;
 	}
 
@@ -285,9 +192,6 @@ int _tmain(int argc, _TCHAR* argv[])
 	rc = IRISSTARTW(termflag, timeout, &pInput, &pOutput);
 	if (rc != IRIS_SUCCESS) {
 		_ftprintf(stdout, _T("IRISStartエラー:%s\n"),getiriserror(rc));
-		//swprintf(buf, 2047, _T("IRISStartエラー:%s\n"), getiriserror(rc));
-		//WriteFile(hOut, buf, wcslen(buf), NULL, NULL);
-		//CloseHandle(hOut);
 		return STS_INVBINDIRERR;
 	}
 
@@ -300,9 +204,6 @@ int _tmain(int argc, _TCHAR* argv[])
 		rc = IRISEXECUTEW(&exec);
 		if (rc != IRIS_SUCCESS) {
 			wprintf( _T("IRISネームスペースエラー:%s(%d)\n"), getiriserror(rc),rc);
-		//	swprintf(buf, 2047, _T("IRISネームスペースエラー:%s\n"), getiriserror(rc));
-		//	WriteFile(hOut, buf, wcslen(buf), NULL, NULL);
-		//	CloseHandle(hOut);
 			IRISEND();
 			return STS_INVNAMESPACEERR;
 		}
@@ -315,9 +216,6 @@ int _tmain(int argc, _TCHAR* argv[])
 	rc = IRISPUSHFUNCW(&rflags, 0, NULL, (int)wcslen(ExecRoutine), (unsigned short int *)ExecRoutine);
 	if (rc != IRIS_SUCCESS) {
 		_ftprintf(stdout, _T("IRISRoutine設定エラー:%s\n"), getiriserror(rc));
-	//	swprintf(buf, 2047, _T("IRISRoutine設定エラー:%s\n"), getiriserror(rc));
-	//	WriteFile(hOut, buf, wcslen(buf), NULL, NULL);
-	//	CloseHandle(hOut);
 		IRISEND();
 		return STS_RTNCALLERR;
 	}
@@ -325,9 +223,6 @@ int _tmain(int argc, _TCHAR* argv[])
 	rc = IRISPUSHSTRW((int)wcslen(curdir), (unsigned short int *)curdir);
 	if (rc != IRIS_SUCCESS) {
 		_ftprintf(stdout, _T("IRIS作業Dir設定エラー:%s\n"), getiriserror(rc));
-	//	swprintf(buf, 2047, _T("IRIS作業Dir設定エラー:%s\n"), getiriserror(rc));
-	//	WriteFile(hOut, buf, wcslen(buf), NULL, NULL);
-	//	CloseHandle(hOut);
 		IRISEND();
 		return STS_RTNCALLERR;
 	}
@@ -335,9 +230,6 @@ int _tmain(int argc, _TCHAR* argv[])
 	rc = IRISPUSHSTRW((int)wcslen(loadfile), (unsigned short int *)loadfile);
 	if (rc != IRIS_SUCCESS) {
 		_ftprintf(stdout, _T("IRIS読込ファイル設定エラー:%s\n"), getiriserror(rc));
-	//	swprintf(buf, 2047, _T("IRIS読込ファイル設定エラー:%s\n"), getiriserror(rc));
-	//	WriteFile(hOut, buf, wcslen(buf), NULL, NULL);
-	//	CloseHandle(hOut);
 		IRISEND();
 		return STS_RTNCALLERR;
 	}
@@ -347,9 +239,6 @@ int _tmain(int argc, _TCHAR* argv[])
 		rc = IRISPUSHSTRW((int)wcslen(optv[i]), (unsigned short int *)optv[i]);
 		if (rc != IRIS_SUCCESS) {
 			_ftprintf(stdout, _T("IRISパラメータ設定エラー:%s\n"), getiriserror(rc));
-		//	swprintf(buf, 2047, _T("IRISパラメータ設定エラー:%s\n"), getiriserror(rc));
-		//	WriteFile(hOut, buf, wcslen(buf), NULL, NULL);
-		//	CloseHandle(hOut);
 			IRISEND();
 			return STS_RTNCALLERR;
 		}
@@ -359,9 +248,6 @@ int _tmain(int argc, _TCHAR* argv[])
 	rc = IRISEXTFUN(rflags, optc+2);
 	if (rc != IRIS_SUCCESS) {
 		_ftprintf(stdout, _T("IRISRoutine実行エラー:%s\n"), getiriserror(rc));
-	//	swprintf(buf, 2047, _T("RISRoutine実行エラー:%s\n"), getiriserror(rc));
-	//	WriteFile(hOut, buf, wcslen(buf), NULL, NULL);
-	//	CloseHandle(hOut);
 		IRISEND();
 		return STS_RTNCALLERR;
 	}
@@ -370,16 +256,12 @@ int _tmain(int argc, _TCHAR* argv[])
 	rc = IRISPOPINT(&retval);
 	if (rc != IRIS_SUCCESS) {
 		_ftprintf(stdout, _T("IRIS戻り値取得エラー:%s\n"), getiriserror(rc));
-	//	swprintf(buf, 2047, _T("IRIS戻り値取得エラー:%s\n"), getiriserror(rc));
-	//	WriteFile(hOut, buf, wcslen(buf), NULL, NULL);
-	//	CloseHandle(hOut);
 		IRISEND();
 		return STS_RTNCALLERR;
 	}
 
 	// IRISの終了
 	IRISEND();
-	//CloseHandle(hOut);
 
 	return retval;
 }
