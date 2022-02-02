@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="Cache" version="25">
+  <Document name="program-loader.ZPM">
+    <Module>
+      <Name>program-loader</Name>
+      <Version>1.0.0</Version>
+      <Description>コマンドプロンプトから起動し、xmlファイルにあるzInstProc.INTをロードし実行する</Description>
+      <Packaging>module</Packaging>
+      <SourcesRoot>src</SourcesRoot>
+      <Resource Name="zInstall.PKG"/>
+      <Resource Name="zloader.MAC"/>
+      <FileCopy Name="kit/loader.exe" Target="${bindir}"/>
+      <
+    </Module>
+  </Document>
+</Export>
