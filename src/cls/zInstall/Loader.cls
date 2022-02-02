@@ -3,10 +3,8 @@ Class zInstall.Loader Extends %RegisteredObject
 {
 
 /// Loader.exeを実行させるためのCallinサービスの有効化
-ClassMethod Execute() As %Status [ CodeMode = objectgenerator ]
+ClassMethod EnableCallin() As %Status
 {
- 	do %code.WriteLine(" quit $$$OK")
-	
 	set ret=##class(Security.System).Get("SYSTEM",.prop)
 	quit:$$$ISERR(ret) ret
 	set prop("AutheEnabled")=2047

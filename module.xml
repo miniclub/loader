@@ -8,9 +8,11 @@
       <Packaging>module</Packaging>
       <SourcesRoot>src</SourcesRoot>
       <Resource Name="zInstall.PKG"/>
-      <Resource Name="zloader.MAC"/>
+      <Resource Name="%ZLOADER.MAC"/>
       <FileCopy Name="kit/loader.exe" Target="${bindir}"/>
-      <
+      <Invokes>
+        <Invoke Class="zInstall.Loader" Method="EnableCallin"></Invoke>
+      </Invokes>
     </Module>
   </Document>
 </Export>
