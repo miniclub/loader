@@ -37,6 +37,8 @@ int parseoption(int argc, _TCHAR * argv[])
 	int opt = OPT_FILENAME;
 
 	for( int i = 1; i < argc; i++ ) {
+		//	_ftprintf(stdout, _T("  %d: %s\n"), i,argv[i]);
+
 		if( opt == OPT_FILENAME && (* argv[i] == '-' || * argv[i] == '/') ) {
 			switch(*(argv[i]+1)) {
 				case 'U':
@@ -54,7 +56,27 @@ int parseoption(int argc, _TCHAR * argv[])
 		} else {
 			switch (opt) {
 				case OPT_NAMESPACE:
-					irisnamespace = argv[i];
+/*					int loop;
+					wchar_t* ptr;
+					ptr = argv[i];
+
+					for (loop = 0;loop < 32; loop++, ptr++) {
+						_ftprintf(stdout, _T("%02X "), *ptr);
+						if (*ptr == '\0') {
+							_ftprintf(stdout, _T("\n"));
+							break;
+						}
+					}
+*/
+					if (*argv[i] == '\"') {
+						if (*(argv[i] + _tcslen(argv[i]) - 1) == '\"') {
+							*(argv[i] + _tcslen(argv[i]) - 1) = '\0';
+						}
+						irisnamespace = (argv[i] + 1);
+					}
+					else {
+						irisnamespace = argv[i];
+					}
 					break;
 				default:
 					filename = argv[i];
@@ -70,7 +92,7 @@ int parseoption(int argc, _TCHAR * argv[])
 
 	// ファイル名指定チェック
 	if( filename == NULL ) {
-		fprintf(stdout, "ファイル名が指定されていません\n");
+		_ftprintf(stdout, _T("ファイル名が指定されていません\n"));
 		return STS_INVOPTION;
 	}
 
@@ -83,30 +105,33 @@ wchar_t * getiriserror(int rc)
 	switch (rc)
 	{
 	case IRIS_ACCESSDENIED:
-		sMes = L"認証に失敗しました。監査ログにて実際の認証エラーを確認してください";
+		sMes = _T("認証に失敗しました。監査ログにて実際の認証エラーを確認してください");
 		break;
 	case IRIS_ALREADYCON:
-		sMes = L"既に接続されています";
+		sMes = _T("既に接続されています");
 		break;
 	case IRIS_CHANGEPASSWORD:
-		sMes = L"パスワードの変更が必要です";
+		sMes = _T("パスワードの変更が必要です");
 		break;
 	case IRIS_CONBROKEN:
-		sMes = L"コネクションが切断されています";
+		sMes = _T("コネクションが切断されています");
 		break;
 	case IRIS_STRTOOLONG:
-		sMes = L"入出力デバイスの文字列が長すぎます";
+		sMes = _T("入出力デバイスの文字列が長すぎます");
 		break;
 	case IRIS_SUCCESS:
-		sMes = L"成功";
+		sMes = _T("成功");
 		break;
 	case IRIS_FAILURE:
 	default:
-		sMes = L"処理が失敗しました";
+		sMes = _T("処理が失敗しました");
 	}
 	return sMes;
 }
-
+void OutputExitCode(int rc)
+{
+	_ftprintf(stdout, _T("\n%d\n"), rc);
+}
 // メイン処理
 int _tmain(int argc, _TCHAR* argv[])
 {
@@ -122,7 +147,8 @@ int _tmain(int argc, _TCHAR* argv[])
 	int retval;
 
 	// Unicodeロケール
-	setlocale(LC_CTYPE, "");
+	_tsetlocale(LC_ALL, _T("japanese"));
+	//setlocale(LC_CTYPE, "");
 
 	// 現在のディレクトリを求める
 	GetCurrentDirectory(sizeof(curdir), curdir);
@@ -130,6 +156,7 @@ int _tmain(int argc, _TCHAR* argv[])
 	// コマンドオプションの解析
 	if ((rc = parseoption(argc, argv)) != 0) {
 		_ftprintf(stdout, _T("使用方法: loader [ -U ネームスペース ] インストールファイル名 [ オプション... ]\n"));
+		OutputExitCode(rc);
 		return rc;
 	}
 	// 二重起動の禁止
@@ -139,12 +166,14 @@ int _tmain(int argc, _TCHAR* argv[])
 	if (hMutex == NULL) {
 		len = FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM, 0, GetLastError(), 0, errmsg, sizeof(errmsg), 0);
 		errmsg[len] = 0;
-		fwprintf(stdout, _T("ミューテックスがオープンできません\n%s\n"), errmsg);
+		_ftprintf(stdout, _T("ミューテックスがオープンできません\n%s\n"), errmsg);
+		OutputExitCode(STS_IOERR);
 		return STS_IOERR;
 	}
 	if (GetLastError() == ERROR_ALREADY_EXISTS) {
 		CloseHandle(hMutex);
 		_ftprintf(stdout, _T("現在インストーラが実行中です\n"));
+		OutputExitCode(STS_BUSY);
 		return STS_BUSY;
 	}
 
@@ -152,6 +181,7 @@ int _tmain(int argc, _TCHAR* argv[])
 	if (!GetModuleFileNameA(NULL, myBinaryDir, MAX_PATH))
 	{
 		_ftprintf(stdout, _T("実行ファイルのディレクトリが取得できません\n"));
+		OutputExitCode(STS_INVBINDIRERR);
 		return STS_INVBINDIRERR;
 	}
 
@@ -159,6 +189,7 @@ int _tmain(int argc, _TCHAR* argv[])
 	char *pTmp = strrchr(myBinaryDir, (int)'\\');
 	if (pTmp == NULL) {
 		_ftprintf(stdout, _T("Mgrディレクトリが取得できません\n"));
+		OutputExitCode(STS_INVBINDIRERR);
 		return STS_INVBINDIRERR;
 	}
 	*(pTmp+1) = '\0';
@@ -182,6 +213,7 @@ int _tmain(int argc, _TCHAR* argv[])
 	rc = IRISSETDIR(myMgrDir);
 	if (rc != IRIS_SUCCESS) {
 		_ftprintf(stdout, _T("Mgrディレクトリが設定できません\n"));
+		OutputExitCode(STS_INVBINDIRERR);
 		return STS_INVBINDIRERR;
 	}
 
@@ -192,6 +224,7 @@ int _tmain(int argc, _TCHAR* argv[])
 	rc = IRISSTARTW(termflag, timeout, &pInput, &pOutput);
 	if (rc != IRIS_SUCCESS) {
 		_ftprintf(stdout, _T("IRISStartエラー:%s\n"),getiriserror(rc));
+		OutputExitCode(STS_INVBINDIRERR);
 		return STS_INVBINDIRERR;
 	}
 
@@ -199,12 +232,14 @@ int _tmain(int argc, _TCHAR* argv[])
 	if (irisnamespace != NULL)
 	{
 		IRISWSTR exec;
-		wsprintf((wchar_t *)exec.str, L"zn \"%s\"", irisnamespace);
+		//wsprintf((wchar_t*)exec.str, L"zn \"%s\"", irisnamespace);
+		wsprintf((wchar_t*)exec.str, _T("set $namespace=\"%s\""), irisnamespace);
 		exec.len = (unsigned short)wcslen((wchar_t *)exec.str);
 		rc = IRISEXECUTEW(&exec);
 		if (rc != IRIS_SUCCESS) {
 			wprintf( _T("IRISネームスペースエラー:%s(%d)\n"), getiriserror(rc),rc);
 			IRISEND();
+			OutputExitCode(STS_INVNAMESPACEERR);
 			return STS_INVNAMESPACEERR;
 		}
 	}
@@ -217,6 +252,7 @@ int _tmain(int argc, _TCHAR* argv[])
 	if (rc != IRIS_SUCCESS) {
 		_ftprintf(stdout, _T("IRISRoutine設定エラー:%s\n"), getiriserror(rc));
 		IRISEND();
+		OutputExitCode(STS_RTNCALLERR);
 		return STS_RTNCALLERR;
 	}
 
@@ -224,6 +260,7 @@ int _tmain(int argc, _TCHAR* argv[])
 	if (rc != IRIS_SUCCESS) {
 		_ftprintf(stdout, _T("IRIS作業Dir設定エラー:%s\n"), getiriserror(rc));
 		IRISEND();
+		OutputExitCode(STS_RTNCALLERR);
 		return STS_RTNCALLERR;
 	}
 
@@ -231,6 +268,7 @@ int _tmain(int argc, _TCHAR* argv[])
 	if (rc != IRIS_SUCCESS) {
 		_ftprintf(stdout, _T("IRIS読込ファイル設定エラー:%s\n"), getiriserror(rc));
 		IRISEND();
+		OutputExitCode(STS_RTNCALLERR);
 		return STS_RTNCALLERR;
 	}
 
@@ -240,6 +278,7 @@ int _tmain(int argc, _TCHAR* argv[])
 		if (rc != IRIS_SUCCESS) {
 			_ftprintf(stdout, _T("IRISパラメータ設定エラー:%s\n"), getiriserror(rc));
 			IRISEND();
+			OutputExitCode(STS_RTNCALLERR);
 			return STS_RTNCALLERR;
 		}
 	}
@@ -249,6 +288,7 @@ int _tmain(int argc, _TCHAR* argv[])
 	if (rc != IRIS_SUCCESS) {
 		_ftprintf(stdout, _T("IRISRoutine実行エラー:%s\n"), getiriserror(rc));
 		IRISEND();
+		OutputExitCode(STS_RTNCALLERR);
 		return STS_RTNCALLERR;
 	}
 
@@ -257,12 +297,14 @@ int _tmain(int argc, _TCHAR* argv[])
 	if (rc != IRIS_SUCCESS) {
 		_ftprintf(stdout, _T("IRIS戻り値取得エラー:%s\n"), getiriserror(rc));
 		IRISEND();
+		OutputExitCode(STS_RTNCALLERR);
 		return STS_RTNCALLERR;
 	}
 
 	// IRISの終了
 	IRISEND();
 
+	OutputExitCode(retval);
 	return retval;
 }
 
